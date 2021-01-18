@@ -1,0 +1,97 @@
+kubectl create secret generic mssql-pwd --from-literal=SA_PASSWORD="P@ssw0rd1234" --namespace=develop
+-------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mssql-pv
+  namespace: develop
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  storageClassName: azurefile
+  azureFile:
+    secretName: storage-secret
+    shareName: sqlserver
+    readOnly: false
+  mountOptions:
+  - dir_mode=0777
+  - file_mode=0777
+  - uid=1000
+  - gid=1000
+  - mfsymlinks
+  - nobrl
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mssql-vc
+  namespace: develop
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: azurefile
+  volumeName: mssql-pv
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: develop
+  name: sqlserver2019
+  labels:
+    app: sqlserver2019-deployment
+spec:
+  selector:
+    matchLabels:
+      app: sqlserver2019-deployment
+  template:
+    metadata:
+      labels:
+        app: sqlserver2019-deployment
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: mssql
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        ports:
+        - containerPort: 1433
+        env:
+        - name: MSSQL_PID
+          value: "Developer"
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: SA_PASSWORD
+          value: "P@ssw0rd1234"
+        volumeMounts:
+        - name: mssqldb
+          mountPath: /var/opt/mssql
+      volumes:
+      - name: mssqldb
+        persistentVolumeClaim:
+         claimName: mssql-vc
+        # emptyDir:
+          # {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: develop
+  name: sqlserver2019-svc
+  annotations:
+    service.beta.kubernetes.io/azure-dns-label-name: devdemodb  
+spec:
+  selector:
+    app: sqlserver2019-deployment
+  ports:
+    - protocol: TCP
+      port: 1433
+      targetPort: 1433
+  type: LoadBalancer
+  # type: ClusterIP
