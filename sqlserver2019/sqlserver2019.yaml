@@ -5,15 +5,15 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: mssql-pv
-  namespace: develop
+  namespace: default
 spec:
   capacity:
-    storage: 1Gi
+    storage: 2Gi
   accessModes:
   - ReadWriteMany
   storageClassName: azurefile
   azureFile:
-    secretName: storage-secret
+    secretName: sqlstorage-secret
     shareName: sqlserver
     readOnly: false
   mountOptions:
@@ -29,20 +29,21 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mssql-vc
-  namespace: develop
+  namespace: default
 spec:
   accessModes:
   - ReadWriteMany
   resources:
     requests:
-      storage: 1Gi
+      storage: 2Gi
   storageClassName: azurefile
   volumeName: mssql-pv
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: develop
+  namespace: default
   name: sqlserver2019
   labels:
     app: sqlserver2019-deployment
@@ -76,16 +77,15 @@ spec:
       - name: mssqldb
         persistentVolumeClaim:
          claimName: mssql-vc
-        # emptyDir:
-          # {}
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: develop
+  namespace: default
   name: sqlserver2019-svc
   annotations:
-    service.beta.kubernetes.io/azure-dns-label-name: devdemodb  
+    service.beta.kubernetes.io/azure-dns-label-name: amrydemodb
 spec:
   selector:
     app: sqlserver2019-deployment
